@@ -1,0 +1,457 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Swipe Expenses</title>
+<style>
+:root{
+  --bg:#f4f5f7; --surface:#ffffff; --text:#16181d; --muted:#6b7280; --line:#e2e5ea;
+  --fixed:#2563eb; --fixed-bg:#e8effd; --flex:#d97706; --flex-bg:#fdf1de; --shadow:0 10px 30px rgba(20,24,35,.14);
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#111318; --surface:#1c1f27; --text:#eceef2; --muted:#9aa1ae; --line:#2b2f3a;
+    --fixed:#6aa0ff; --fixed-bg:#1b2742; --flex:#f2a53a; --flex-bg:#3a2b12; --shadow:0 10px 30px rgba(0,0,0,.5);
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#111318; --surface:#1c1f27; --text:#eceef2; --muted:#9aa1ae; --line:#2b2f3a;
+  --fixed:#6aa0ff; --fixed-bg:#1b2742; --flex:#f2a53a; --flex-bg:#3a2b12; --shadow:0 10px 30px rgba(0,0,0,.5);
+}
+*{box-sizing:border-box}
+html,body{height:100%;margin:0}
+body{background:var(--bg);color:var(--text);font:16px/1.4 -apple-system,system-ui,"Segoe UI",sans-serif;
+  overscroll-behavior:none;-webkit-user-select:none;user-select:none;
+  padding:env(safe-area-inset-top) 16px env(safe-area-inset-bottom);
+  display:flex;flex-direction:column;align-items:center}
+.wrap{width:100%;max-width:440px;height:100dvh;display:flex;flex-direction:column;gap:12px;padding:12px 0}
+header{display:flex;justify-content:space-between;align-items:center;position:relative;gap:8px}
+.hright{display:flex;align-items:center;gap:6px}
+#menu-btn{padding:2px 10px;font-size:1.2rem;line-height:1.2;border-radius:10px;font-weight:700;color:var(--muted)}
+.menu{position:absolute;right:0;top:calc(100% + 6px);z-index:5;min-width:190px;background:var(--surface);border:1px solid var(--line);border-radius:14px;box-shadow:var(--shadow);padding:6px;display:flex;flex-direction:column}
+.menu button{border:0;text-align:left;border-radius:9px;padding:10px 12px;font-weight:550;background:transparent}
+.menu button:hover{background:var(--bg)}
+.menu hr{border:0;border-top:1px solid var(--line);margin:4px 0;width:100%}
+.menu .danger{color:var(--flex)}
+header h1{font-size:1.05rem;margin:0;font-weight:650}
+header .count{color:var(--muted);font-size:.9rem;font-variant-numeric:tabular-nums}
+.mode{display:inline-flex;border:1px solid var(--line);border-radius:999px;overflow:hidden;margin-left:8px;vertical-align:middle}
+.mode button{border:0;border-radius:0;padding:2px 9px;font-size:.72rem;font-weight:600;background:transparent;color:var(--muted)}
+.mode button[aria-pressed="true"]{background:var(--text);color:var(--bg)}
+.bar{height:6px;background:var(--line);border-radius:3px;overflow:hidden}
+.bar>i{display:block;height:100%;width:0;background:var(--text);opacity:.7;transition:width .25s}
+.totals{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;font-variant-numeric:tabular-nums}
+.totals div{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:6px 8px;font-size:.78rem;color:var(--muted)}
+.totals b{display:block;font-size:.98rem;color:var(--text)}
+.totals .t-fixed{border-left:4px solid var(--fixed)}
+.totals .t-flex{border-left:4px solid var(--flex)}
+.stage{position:relative;flex:1;min-height:300px;margin:6px 0}
+.card{position:absolute;inset:0;background:var(--surface);border:1px solid var(--line);border-radius:22px;box-shadow:var(--shadow);
+  padding:22px 22px 18px;display:flex;flex-direction:column;gap:10px;touch-action:none;cursor:grab;will-change:transform}
+.card.back1{transform:translateY(12px) scale(.96);opacity:.85;pointer-events:none}
+.card.back2{transform:translateY(24px) scale(.92);opacity:.6;pointer-events:none}
+.card.back1>*,.card.back2>*{visibility:hidden}
+.card.dragging{cursor:grabbing}
+.card.fly{transition:transform .25s ease-in,opacity .25s}
+.card.snap{transition:transform .2s ease-out}
+.stamp{position:absolute;top:22px;padding:4px 12px;border:3px solid;border-radius:10px;font-weight:800;letter-spacing:.06em;
+  font-size:1.2rem;opacity:0;pointer-events:none}
+.stamp.s-fixed{right:20px;color:var(--fixed);border-color:var(--fixed);transform:rotate(8deg)}
+.stamp.s-flex{left:20px;color:var(--flex);border-color:var(--flex);transform:rotate(-8deg)}
+.rank{color:var(--muted);font-size:.8rem;font-variant-numeric:tabular-nums}
+.amount{font-size:3rem;font-weight:750;letter-spacing:-.02em;font-variant-numeric:tabular-nums;margin-top:18px;word-break:break-word}
+.merchant{font-size:1.35rem;font-weight:650}
+.meta{display:flex;flex-wrap:wrap;gap:8px;margin-top:2px}
+.chip{border:1px solid var(--line);border-radius:999px;padding:3px 10px;font-size:.8rem;color:var(--muted)}
+.chip.hint-fixed{background:var(--fixed-bg);color:var(--fixed);border-color:transparent;font-weight:600}
+.chip.hint-flexible{background:var(--flex-bg);color:var(--flex);border-color:transparent;font-weight:600}
+.desc{margin-top:auto;color:var(--muted);font-size:.8rem;font-family:ui-monospace,Menlo,monospace;word-break:break-word}
+.src{color:var(--muted);font-size:.85rem}
+button{font:inherit;border:1px solid var(--line);background:var(--surface);color:var(--text);border-radius:14px;padding:14px 10px;cursor:pointer;font-weight:650}
+button:active{transform:scale(.97)}
+button:focus-visible{outline:3px solid var(--text);outline-offset:2px}
+.b-flex{border-color:var(--flex);color:var(--flex)}
+.b-fixed{border-color:var(--fixed);color:var(--fixed)}
+.small{display:flex;gap:8px;justify-content:center}
+.small button{font-size:.85rem;font-weight:550;padding:8px 12px;border-radius:10px;color:var(--muted)}
+.small button:disabled{opacity:.4;cursor:default}
+.hints{display:flex;justify-content:space-between;font-size:.9rem;font-weight:650;padding:0 8px;font-variant-numeric:tabular-nums}
+.hints .h-flex{color:var(--flex)}.hints .h-fixed{color:var(--fixed)}.hints .h-skip{color:var(--muted)}
+.stamp.s-skip{left:50%;top:auto;bottom:22px;color:var(--muted);border-color:var(--muted);transform:translateX(-50%)}
+.keys{text-align:center;color:var(--muted);font-size:.75rem}
+.panel{background:var(--surface);border:1px solid var(--line);border-radius:18px;padding:20px;display:flex;flex-direction:column;gap:12px;box-shadow:var(--shadow)}
+.panel h2{margin:0;font-size:1.2rem}
+.split{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.split div{border-radius:12px;padding:12px;font-variant-numeric:tabular-nums}
+.split .f{background:var(--fixed-bg);color:var(--fixed)}
+.split .x{background:var(--flex-bg);color:var(--flex)}
+.split b{display:block;font-size:1.4rem}
+.list{max-height:30dvh;overflow:auto;font-size:.85rem;border-top:1px solid var(--line)}
+.list div{display:flex;justify-content:space-between;gap:8px;padding:6px 0;border-bottom:1px solid var(--line)}
+.stub{border:1px dashed var(--line);border-radius:12px;padding:10px;font-size:.85rem;color:var(--muted)}
+.hidden{display:none}
+.small{flex-wrap:wrap}
+.note{font-size:.85rem;color:var(--text);background:var(--bg);border-radius:10px;padding:6px 10px}
+.note .tg{display:inline-block;font-size:.7rem;font-weight:650;border:1px solid var(--line);border-radius:999px;padding:0 7px;margin-right:4px;color:var(--muted)}
+#dlg-note{margin:auto auto 0;width:100%;max-width:440px;border-radius:18px 18px 0 0;padding:16px 16px calc(16px + env(safe-area-inset-bottom))}
+#dlg-note textarea{width:100%;min-height:76px;font:inherit;font-size:16px;border:1px solid var(--line);border-radius:10px;padding:8px;background:var(--bg);color:var(--text);resize:vertical;-webkit-user-select:text;user-select:text}
+#dlg-note .tags{display:flex;flex-wrap:wrap;gap:6px;margin:8px 0}
+#dlg-note .tags button{padding:5px 11px;font-size:.82rem;font-weight:550;border-radius:999px}
+#dlg-note .tags button[aria-pressed="true"]{background:var(--text);color:var(--bg);border-color:var(--text)}
+#dlg-note .sub{display:flex;justify-content:space-between;color:var(--muted);font-size:.78rem;margin-top:4px}
+.tagtot{font-size:.85rem}
+.moeq{color:var(--muted);font-size:.9rem;margin-top:-6px}
+.months{display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin:0 0 8px;font-size:.85rem}
+.months button{padding:4px 10px;font-size:.8rem;border-radius:999px}
+.months input{width:64px;font:inherit;font-size:16px;padding:5px 8px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--text);-webkit-user-select:text;user-select:text}
+.smooth{font-size:.85rem;color:var(--muted);background:var(--bg);border-radius:10px;padding:8px 10px}
+.banner{text-align:center;font-size:.72rem;color:var(--muted);background:var(--surface);border:1px dashed var(--line);border-radius:8px;padding:3px}
+dialog{border:1px solid var(--line);border-radius:18px;background:var(--surface);color:var(--text);max-width:420px;width:calc(100% - 32px)}
+dialog::backdrop{background:rgba(0,0,0,.45)}
+dialog h2{margin:0 0 8px}
+dialog .row{display:flex;gap:8px;margin-top:12px}
+dialog .row button{flex:1}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="banner">SAMPLE DATA (invented). Decisions stay in this browser only.</div>
+  <header><h1 id="title"></h1><div class="hright"><div><span class="count" id="count" aria-live="polite"></span><span class="mode" role="group" aria-label="Progress measured by"><button id="pm-count" aria-pressed="true">Count</button><button id="pm-dollars" aria-pressed="false">Dollars</button></span></div><button id="menu-btn" aria-haspopup="true" aria-expanded="false" aria-controls="menu" aria-label="More options">&#8943;</button></div><div class="menu hidden" id="menu" role="menu"><button role="menuitem" id="btn-rerun">Re-run month</button><button role="menuitem" id="btn-runs">Past runs</button><hr><button role="menuitem" id="btn-reset" class="danger">Reset mockup</button></div></header>
+  <div class="bar" aria-hidden="true"><i id="bar"></i></div>
+  <div class="totals">
+    <div class="t-flex"><span>Flexible</span><b id="t-flex"></b></div>
+    <div class="t-fixed"><span>Fixed</span><b id="t-fixed"></b></div>
+    <div><span>Remaining</span><b id="t-rem"></b></div>
+  </div>
+  <div class="stage" id="stage"></div>
+  <div id="controls">
+    <div class="hints"><span class="h-flex">&larr; Flexible</span><span class="h-skip">&darr; Skip</span><span class="h-fixed">Fixed &rarr;</span></div>
+    <div class="small" style="margin-top:8px">
+      <button id="btn-undo">Undo</button>
+      <button id="btn-note">Note (N)</button>
+    </div>
+    <div class="keys">Swipe the card, or use keys: &larr; flexible &middot; &rarr; fixed &middot; &darr; skip &middot; Z undo &middot; N note</div>
+  </div>
+</div>
+
+<dialog id="dlg-note">
+  <h2 id="note-title" style="font-size:1.05rem"></h2>
+  <div class="tags" id="note-tags"></div>
+  <textarea id="note-text" maxlength="280" placeholder="Context to remember (optional)"></textarea>
+  <div class="sub"><span id="note-warn"></span><span id="note-count"></span></div>
+  <div class="row"><button id="note-clear">Clear</button><button id="note-cancel">Cancel</button><button id="note-save" class="b-fixed">Save</button></div>
+</dialog>
+<dialog id="dlg-prepaid">
+  <h2>How many months does this cover?</h2>
+  <div id="pp-what" class="stub" style="margin-bottom:8px"></div>
+  <div class="months"><span id="mq"></span><input id="note-months-in" type="number" min="2" max="60" inputmode="numeric" placeholder="#" aria-label="Months covered"> months</div>
+  <div id="pp-prev" class="sub"></div>
+  <div class="row"><button id="pp-back">&larr; Back</button><button id="pp-remove" class="hidden">Remove tag</button><button id="pp-ok" class="b-fixed">Confirm</button></div>
+</dialog>
+<dialog id="dlg-rerun">
+  <h2>Re-run September</h2>
+  <p>Archives your current answers and starts a new pass over the same stack.</p>
+  <label><input type="radio" name="mode" checked> Start from my previous answers (default)</label><br>
+  <label><input type="radio" name="mode"> Start fresh (hints come from rules)</label>
+  <div class="stub">Not wired up yet. In the real app this archives the current run and keeps it under Past runs.</div>
+  <div class="row"><button value="cancel" id="rr-close">Close</button></div>
+</dialog>
+<dialog id="dlg-runs">
+  <h2>Past runs</h2>
+  <div class="stub">Nothing archived yet. In the real app, each re-run appears here with its fixed/flexible split, a Compare button (shows what changed) and a Restore button.</div>
+  <div class="row"><button id="runs-close">Close</button></div>
+</dialog>
+
+<script>
+const DATA = [{"date": "2025-03-11", "merchant": "Harborview Mortgage", "category": "Mortgage", "source_label": "Sample Checking", "suggested": "fixed", "amount": -2480, "description": "HARBORVIEW MORTGAGE ****ENWBCT", "id": "sample:0"}, {"date": "2025-03-04", "merchant": "Riverside Auto Finance", "category": "Auto loan", "source_label": "Sample Checking", "suggested": "fixed", "amount": -512, "description": "RIVERSIDE AUTO FINANCE ****MUBSGB", "id": "sample:1"}, {"date": "2025-03-03", "merchant": "Lakeside Power & Light", "category": "Utilities", "source_label": "Sample Checking", "suggested": "fixed", "amount": -168, "description": "LAKESIDE POWER & LIGHT ****PPCHCT", "id": "sample:2"}, {"date": "2025-03-14", "merchant": "Northstar Insurance", "category": "Insurance", "source_label": "Sample Card \u2022\u20220001", "suggested": "fixed", "amount": -342, "description": "NORTHSTAR INSURANCE ****BUDHWW", "id": "sample:3"}, {"date": "2025-03-19", "merchant": "Skyline Internet", "category": "Internet/Phone", "source_label": "Sample Card \u2022\u20220001", "suggested": "fixed", "amount": -79, "description": "SKYLINE INTERNET ****BUUNBH", "id": "sample:4"}, {"date": "2025-03-02", "merchant": "Summit Mobile", "category": "Internet/Phone", "source_label": "Sample Card \u2022\u20220001", "suggested": "fixed", "amount": -94, "description": "SUMMIT MOBILE ****TEKPET", "id": "sample:5"}, {"date": "2025-03-04", "merchant": "Maple Camp & Rec", "category": "Activities", "source_label": "Sample Card \u2022\u20220001", "suggested": "flexible", "amount": -640, "description": "MAPLE CAMP & REC ****UKTXFD", "id": "sample:6"}, {"date": "2025-03-19", "merchant": "Oak & Anchor Furnishings", "category": "Home/Garden", "source_label": "Sample Card \u2022\u20220001", "suggested": "flexible", "amount": -780, "description": "OAK & ANCHOR FURNISHINGS ****UWGMDT", "id": "sample:7"}, {"date": "2025-03-23", "merchant": "Bluebird Travel Rentals", "category": "Travel", "source_label": "Sample Card \u2022\u20220001", "suggested": "flexible", "amount": -1150, "description": "BLUEBIRD TRAVEL RENTALS ****CUBVGR", "id": "sample:8"}, {"date": "2025-03-14", "merchant": "Greenfield Market", "category": "Groceries", "source_label": "Sample Card \u2022\u20220001", "suggested": "flexible", "amount": -141.42, "description": "GREENFIELD MARKET ****LQUQMK", "id": "sample:9"}, {"date": "2025-03-06", "merchant": "Greenfield Market", "category": "Groceries", "source_label": "Sample Card \u2022\u20220001", "suggested": "flexible", "amount": -75.76, "description": "GREENFIELD MARKET ****YHCUKS", "id": "sample:10"}, {"date": "2025-03-11", "merchant": "Greenfield Market", "category": "Groceries", "source_label": "Sample Card \u2022\u20220001", "suggested": "flexible", "amount": -113.26, "description": "GREENFIELD MARKET ****ZQKVCD", "id": "sample:11"}, {"date": "2025-03-06", "merchant": "Greenfield Market", "category": "Groceries", "source_label": "Sample Card \u2022\u20220001", "suggested": "flexible", "amount": -115.81, "description": "GREENFIELD MARKET ****LERPBX", "id": "sample:12"}, {"date": "2025-03-18", "merchant": "Greenfield Market", "category": "Groceries", "source_label": "Sample Card \u2022\u20220001", "suggested": "flexible", "amount": -49.8, "description": "GREENFIELD MARKET ****ULLYMV", "id": "sample:13"}, {"date": "2025-03-26", "merchant": "Greenfield Market", "category": "Groceries", "source_label": "Sample Card \u2022\u20220001", "suggested": "flexible", "amount": -113.49, "description": "GREENFIELD MARKET ****QCCJRY", "id": "sample:14"}, {"date": "2025-03-02", "merchant": "Greenfield Market", "category": "Groceries", "source_label": "Sample Card \u2022\u20220001", "suggested": "flexible", "amount": -138.95, "description": "GREENFIELD MARKET ****ZYKWUX", "id": "sample:15"}, {"date": "2025-03-10", "merchant": "Greenfield Market", "category": "Groceries", "source_label": "Sample Card \u2022\u20220001", "suggested": "flexible", "amount": -162.93, "description": "GREENFIELD MARKET ****YNXMAQ", "id": "sample:16"}, {"date": "2025-03-20", "merchant": "Greenfield Market", "category": "Groceries", "source_label": "Sample Card \u2022\u20220001", "suggested": "flexible", "amount": -92.03, "description": "GREENFIELD MARKET ****DRBGKE", "id": "sample:17"}, {"date": "2025-03-13", "merchant": "Corner Grocer", "category": "Groceries", "source_label": "Sample Card \u2022\u20220002", "suggested": "flexible", "amount": -75.9, "description": "CORNER GROCER ****NRCFQN", "id": "sample:18"}, {"date": "2025-03-05", "merchant": "Corner Grocer", "category": "Groceries", "source_label": "Sample Card \u2022\u20220002", "suggested": "flexible", "amount": -62.11, "description": "CORNER GROCER ****PTJYPM", "id": "sample:19"}, {"date": "2025-03-13", "merchant": "Corner Grocer", "category": "Groceries", "source_label": "Sample Card \u2022\u20220002", "suggested": "flexible", "amount": -71.84, "description": "CORNER GROCER ****HECFEH", "id": "sample:20"}, {"date": "2025-03-01", "merchant": "Corner Grocer", "category": "Groceries", "source_label": "Sample Card \u2022\u20220002", "suggested": "flexible", "amount": -70.07, "description": "CORNER GROCER ****RUFJKA", "id": "sample:21"}, {"date": "2025-03-18", "merchant": "Corner Grocer", "category": "Groceries", "source_label": "Sample Card \u2022\u20220002", "suggested": "flexible", "amount": -32.63, "description": "CORNER GROCER ****MVULEY", "id": "sample:22"}, {"date": "2025-03-20", "merchant": "Corner Grocer", "category": "Groceries", "source_label": "Sample Card \u2022\u20220002", "suggested": "flexible", "amount": -84.72, "description": "CORNER GROCER ****WXZBQX", "id": "sample:23"}, {"date": "2025-03-13", "merchant": "QuickBite Delivery", "category": "Dining out", "source_label": "Sample Card \u2022\u20220001", "suggested": "flexible", "amount": -67.09, "description": "QUICKBITE DELIVERY ****NNNDRW", "id": "sample:24"}, {"date": "2025-03-07", "merchant": "QuickBite Delivery", "category": "Dining out", "source_label": "Sample Card \u2022\u20220001", "suggested": "flexible", "amount": -45.62, "description": "QUICKBITE DELIVERY ****CGQFDL", "id": "sample:25"}, {"date": "2025-03-04", "merchant": "QuickBite Delivery", "category": "Dining out", "source_label": "Sample Card \u2022\u20220001", "suggested": "flexible", "amount": -56.44, "description": "QUICKBITE DELIVERY ****AUETDM", "id": "sample:26"}, {"date": "2025-03-03", "merchant": "QuickBite Delivery", "category": "Dining out", "source_label": "Sample Card \u2022\u20220001", "suggested": "flexible", "amount": -57.14, "description": "QUICKBITE DELIVERY ****GVNEWJ", "id": "sample:27"}, {"date": "2025-03-20", "merchant": "QuickBite Delivery", "category": "Dining out", "source_label": "Sample Card \u2022\u20220001", "suggested": "flexible", "amount": -75.6, "description": "QUICKBITE DELIVERY ****MRDDRQ", "id": "sample:28"}, {"date": "2025-03-10", "merchant": "QuickBite Delivery", "category": "Dining out", "source_label": "Sample Card \u2022\u20220001", "suggested": "flexible", "amount": -49.94, "description": "QUICKBITE DELIVERY ****CEDZLZ", "id": "sample:29"}, {"date": "2025-03-27", "merchant": "QuickBite Delivery", "category": "Dining out", "source_label": "Sample Card \u2022\u20220001", "suggested": "flexible", "amount": -38.3, "description": "QUICKBITE DELIVERY ****YFSAGS", "id": "sample:30"}, {"date": "2025-03-23", "merchant": "QuickBite Delivery", "category": "Dining out", "source_label": "Sample Card \u2022\u20220001", "suggested": "flexible", "amount": -43.53, "description": "QUICKBITE DELIVERY ****TASKWC", "id": "sample:31"}, {"date": "2025-03-09", "merchant": "Copper Kettle Cafe", "category": "Dining out", "source_label": "Sample Card \u2022\u20220002", "suggested": "flexible", "amount": -31.06, "description": "COPPER KETTLE CAFE ****SMFMHT", "id": "sample:32"}, {"date": "2025-03-17", "merchant": "Copper Kettle Cafe", "category": "Dining out", "source_label": "Sample Card \u2022\u20220002", "suggested": "flexible", "amount": -25.5, "description": "COPPER KETTLE CAFE ****LWHVGH", "id": "sample:33"}, {"date": "2025-03-24", "merchant": "Copper Kettle Cafe", "category": "Dining out", "source_label": "Sample Card \u2022\u20220002", "suggested": "flexible", "amount": -35.46, "description": "COPPER KETTLE CAFE ****HGSRMZ", "id": "sample:34"}, {"date": "2025-03-01", "merchant": "Copper Kettle Cafe", "category": "Dining out", "source_label": "Sample Card \u2022\u20220002", "suggested": "flexible", "amount": -7.04, "description": "COPPER KETTLE CAFE ****JRJGYV", "id": "sample:35"}, {"date": "2025-03-15", "merchant": "Copper Kettle Cafe", "category": "Dining out", "source_label": "Sample Card \u2022\u20220002", "suggested": "flexible", "amount": -40.43, "description": "COPPER KETTLE CAFE ****ZMMCHD", "id": "sample:36"}, {"date": "2025-03-07", "merchant": "Copper Kettle Cafe", "category": "Dining out", "source_label": "Sample Card \u2022\u20220002", "suggested": "flexible", "amount": -14.17, "description": "COPPER KETTLE CAFE ****LGRVVA", "id": "sample:37"}, {"date": "2025-03-21", "merchant": "Copper Kettle Cafe", "category": "Dining out", "source_label": "Sample Card \u2022\u20220002", "suggested": "flexible", "amount": -23.26, "description": "COPPER KETTLE CAFE ****MWCXDN", "id": "sample:38"}, {"date": "2025-03-25", "merchant": "Copper Kettle Cafe", "category": "Dining out", "source_label": "Sample Card \u2022\u20220002", "suggested": "flexible", "amount": -34.16, "description": "COPPER KETTLE CAFE ****GRFPWL", "id": "sample:39"}, {"date": "2025-03-24", "merchant": "Copper Kettle Cafe", "category": "Dining out", "source_label": "Sample Card \u2022\u20220002", "suggested": "flexible", "amount": -9.12, "description": "COPPER KETTLE CAFE ****NQNZCZ", "id": "sample:40"}, {"date": "2025-03-05", "merchant": "Juniper Bistro", "category": "Dining out", "source_label": "Sample Card \u2022\u20220001", "suggested": "flexible", "amount": -48.5, "description": "JUNIPER BISTRO ****AEUQWE", "id": "sample:41"}, {"date": "2025-03-20", "merchant": "Juniper Bistro", "category": "Dining out", "source_label": "Sample Card \u2022\u20220001", "suggested": "flexible", "amount": -86.98, "description": "JUNIPER BISTRO ****RXMETT", "id": "sample:42"}, {"date": "2025-03-01", "merchant": "Juniper Bistro", "category": "Dining out", "source_label": "Sample Card \u2022\u20220001", "suggested": "flexible", "amount": -46.13, "description": "JUNIPER BISTRO ****ZWDSZE", "id": "sample:43"}, {"date": "2025-03-28", "merchant": "Juniper Bistro", "category": "Dining out", "source_label": "Sample Card \u2022\u20220001", "suggested": "flexible", "amount": -71.87, "description": "JUNIPER BISTRO ****GGAJGK", "id": "sample:44"}, {"date": "2025-03-25", "merchant": "PumpRight Fuel", "category": "Gas/Automotive", "source_label": "Sample Card \u2022\u20220001", "suggested": "flexible", "amount": -53.04, "description": "PUMPRIGHT FUEL ****ULJTPE", "id": "sample:45"}, {"date": "2025-03-24", "merchant": "PumpRight Fuel", "category": "Gas/Automotive", "source_label": "Sample Card \u2022\u20220001", "suggested": "flexible", "amount": -36.31, "description": "PUMPRIGHT FUEL ****MQXUSP", "id": "sample:46"}, {"date": "2025-03-17", "merchant": "PumpRight Fuel", "category": "Gas/Automotive", "source_label": "Sample Card \u2022\u20220001", "suggested": "flexible", "amount": -65.43, "description": "PUMPRIGHT FUEL ****ETESSA", "id": "sample:47"}, {"date": "2025-03-25", "merchant": "PumpRight Fuel", "category": "Gas/Automotive", "source_label": "Sample Card \u2022\u20220001", "suggested": "flexible", "amount": -67.17, "description": "PUMPRIGHT FUEL ****FVAEFE", "id": "sample:48"}, {"date": "2025-03-24", "merchant": "PumpRight Fuel", "category": "Gas/Automotive", "source_label": "Sample Card \u2022\u20220001", "suggested": "flexible", "amount": -51.99, "description": "PUMPRIGHT FUEL ****DTBLXS", "id": "sample:49"}, {"date": "2025-03-16", "merchant": "PumpRight Fuel", "category": "Gas/Automotive", "source_label": "Sample Card \u2022\u20220001", "suggested": "flexible", "amount": -54.17, "description": "PUMPRIGHT FUEL ****DTBHGJ", "id": "sample:50"}, {"date": "2025-03-04", "merchant": "Cartwheel Online", "category": "Shopping", "source_label": "Sample Card \u2022\u20220001", "suggested": "flexible", "amount": -18.25, "description": "CARTWHEEL ONLINE ****SQTACQ", "id": "sample:51"}, {"date": "2025-03-17", "merchant": "Cartwheel Online", "category": "Shopping", "source_label": "Sample Card \u2022\u20220001", "suggested": "flexible", "amount": -60.19, "description": "CARTWHEEL ONLINE ****VSGYJQ", "id": "sample:52"}, {"date": "2025-03-26", "merchant": "Cartwheel Online", "category": "Shopping", "source_label": "Sample Card \u2022\u20220001", "suggested": "flexible", "amount": -87.21, "description": "CARTWHEEL ONLINE ****RSHYSJ", "id": "sample:53"}, {"date": "2025-03-07", "merchant": "Cartwheel Online", "category": "Shopping", "source_label": "Sample Card \u2022\u20220001", "suggested": "flexible", "amount": -148.57, "description": "CARTWHEEL ONLINE ****QEPDNQ", "id": "sample:54"}, {"date": "2025-03-22", "merchant": "Cartwheel Online", "category": "Shopping", "source_label": "Sample Card \u2022\u20220001", "suggested": "flexible", "amount": -58.77, "description": "CARTWHEEL ONLINE ****HPCGXK", "id": "sample:55"}, {"date": "2025-03-25", "merchant": "Cartwheel Online", "category": "Shopping", "source_label": "Sample Card \u2022\u20220001", "suggested": "flexible", "amount": -128.02, "description": "CARTWHEEL ONLINE ****EYWXME", "id": "sample:56"}, {"date": "2025-03-05", "merchant": "Cartwheel Online", "category": "Shopping", "source_label": "Sample Card \u2022\u20220001", "suggested": "flexible", "amount": -49.46, "description": "CARTWHEEL ONLINE ****QHZDNR", "id": "sample:57"}, {"date": "2025-03-22", "merchant": "Cartwheel Online", "category": "Shopping", "source_label": "Sample Card \u2022\u20220001", "suggested": "flexible", "amount": -36.09, "description": "CARTWHEEL ONLINE ****HFYPSN", "id": "sample:58"}, {"date": "2025-03-07", "merchant": "Cartwheel Online", "category": "Shopping", "source_label": "Sample Card \u2022\u20220001", "suggested": "flexible", "amount": -62.19, "description": "CARTWHEEL ONLINE ****MLCZMA", "id": "sample:59"}, {"date": "2025-03-15", "merchant": "Cartwheel Online", "category": "Shopping", "source_label": "Sample Card \u2022\u20220001", "suggested": "flexible", "amount": -62.02, "description": "CARTWHEEL ONLINE ****QYANLS", "id": "sample:60"}, {"date": "2025-03-17", "merchant": "Cartwheel Online", "category": "Shopping", "source_label": "Sample Card \u2022\u20220001", "suggested": "flexible", "amount": -104.34, "description": "CARTWHEEL ONLINE ****CDHDCJ", "id": "sample:61"}, {"date": "2025-03-25", "merchant": "Cartwheel Online", "category": "Shopping", "source_label": "Sample Card \u2022\u20220001", "suggested": "flexible", "amount": -52.24, "description": "CARTWHEEL ONLINE ****FJEPXJ", "id": "sample:62"}, {"date": "2025-03-18", "merchant": "Dockside Outfitters", "category": "Shopping", "source_label": "Sample Card \u2022\u20220002", "suggested": "flexible", "amount": -103.07, "description": "DOCKSIDE OUTFITTERS ****SURYLC", "id": "sample:63"}, {"date": "2025-03-26", "merchant": "Dockside Outfitters", "category": "Shopping", "source_label": "Sample Card \u2022\u20220002", "suggested": "flexible", "amount": -80.23, "description": "DOCKSIDE OUTFITTERS ****YFPCJA", "id": "sample:64"}, {"date": "2025-03-26", "merchant": "Dockside Outfitters", "category": "Shopping", "source_label": "Sample Card \u2022\u20220002", "suggested": "flexible", "amount": -144.2, "description": "DOCKSIDE OUTFITTERS ****JCVHCJ", "id": "sample:65"}, {"date": "2025-03-28", "merchant": "StreamBox", "category": "Subscriptions", "source_label": "Sample Card \u2022\u20220002", "suggested": "flexible", "amount": -15.99, "description": "STREAMBOX ****DQALTP", "id": "sample:66"}, {"date": "2025-03-09", "merchant": "Tunewave Music", "category": "Subscriptions", "source_label": "Sample Card \u2022\u20220002", "suggested": "flexible", "amount": -10.99, "description": "TUNEWAVE MUSIC ****VEBSYH", "id": "sample:67"}, {"date": "2025-03-04", "merchant": "CloudNest Storage", "category": "Subscriptions", "source_label": "Sample Card \u2022\u20220002", "suggested": "flexible", "amount": -2.99, "description": "CLOUDNEST STORAGE ****FJBFGK", "id": "sample:68"}, {"date": "2025-03-21", "merchant": "Pageturn Reader", "category": "Subscriptions", "source_label": "Sample Card \u2022\u20220002", "suggested": "flexible", "amount": -9.99, "description": "PAGETURN READER ****KSGKQS", "id": "sample:69"}, {"date": "2025-03-22", "merchant": "FitLoop Gym", "category": "Personal care", "source_label": "Sample Checking", "suggested": "flexible", "amount": -45, "description": "FITLOOP GYM ****FJMAJB", "id": "sample:70"}, {"date": "2025-03-24", "merchant": "Cutwell Barbers", "category": "Personal care", "source_label": "Sample Card \u2022\u20220001", "suggested": "flexible", "amount": -28.12, "description": "CUTWELL BARBERS ****STGSRH", "id": "sample:71"}, {"date": "2025-03-04", "merchant": "Cutwell Barbers", "category": "Personal care", "source_label": "Sample Card \u2022\u20220001", "suggested": "flexible", "amount": -35.48, "description": "CUTWELL BARBERS ****XWPXRT", "id": "sample:72"}, {"date": "2025-03-13", "merchant": "Pinecrest Pharmacy", "category": "Health care", "source_label": "Sample Card \u2022\u20220001", "suggested": "flexible", "amount": -49.9, "description": "PINECREST PHARMACY ****SKYGHL", "id": "sample:73"}, {"date": "2025-03-23", "merchant": "Pinecrest Pharmacy", "category": "Health care", "source_label": "Sample Card \u2022\u20220001", "suggested": "flexible", "amount": -18.73, "description": "PINECREST PHARMACY ****ZWENMB", "id": "sample:74"}, {"date": "2025-03-01", "merchant": "Pinecrest Pharmacy", "category": "Health care", "source_label": "Sample Card \u2022\u20220001", "suggested": "flexible", "amount": -50.01, "description": "PINECREST PHARMACY ****CWZJPF", "id": "sample:75"}, {"date": "2025-03-02", "merchant": "Bright Smile Dental", "category": "Health care", "source_label": "Sample Card \u2022\u20220001", "suggested": "flexible", "amount": -95, "description": "BRIGHT SMILE DENTAL ****CXNSXK", "id": "sample:76"}, {"date": "2025-03-23", "merchant": "Quill & Co Stationers", "category": "Shopping", "source_label": "Sample Card \u2022\u20220002", "suggested": "flexible", "amount": -21.17, "description": "QUILL & CO STATIONERS ****KBQFFJ", "id": "sample:77"}, {"date": "2025-03-09", "merchant": "Quill & Co Stationers", "category": "Shopping", "source_label": "Sample Card \u2022\u20220002", "suggested": "flexible", "amount": -17.81, "description": "QUILL & CO STATIONERS ****MLTLHB", "id": "sample:78"}, {"date": "2025-03-10", "merchant": "Quill & Co Stationers", "category": "Shopping", "source_label": "Sample Card \u2022\u20220002", "suggested": "flexible", "amount": -29.24, "description": "QUILL & CO STATIONERS ****GMFALN", "id": "sample:79"}, {"date": "2025-03-03", "merchant": "City Parking Authority", "category": "Taxes & Registration", "source_label": "Sample Card \u2022\u20220001", "suggested": "flexible", "amount": -14, "description": "CITY PARKING AUTHORITY ****RJSWGH", "id": "sample:80"}, {"date": "2025-03-17", "merchant": "Helping Paws Fund", "category": "Charity", "source_label": "Sample Card \u2022\u20220002", "suggested": "flexible", "amount": -25, "description": "HELPING PAWS FUND ****ACJCEN", "id": "sample:81"}, {"date": "2025-03-19", "merchant": "Pocketbank ATM", "category": "Cash/ATM", "source_label": "Sample Checking", "suggested": "flexible", "amount": -60, "description": "POCKETBANK ATM ****BNAKKW", "id": "sample:82"}, {"date": "2025-03-08", "merchant": "Pocketbank ATM fee", "category": "Fees & Interest", "source_label": "Sample Checking", "suggested": "flexible", "amount": -3, "description": "POCKETBANK ATM FEE ****CUSEXY", "id": "sample:83"}, {"date": "2025-03-26", "merchant": "Pocketbank ATM fee", "category": "Fees & Interest", "source_label": "Sample Checking", "suggested": "flexible", "amount": -3, "description": "POCKETBANK ATM FEE ****VNLZRE", "id": "sample:84"}];
+const MONTH_LABEL = "Sample month";
+const KEY = "swipe-mockup-" + MONTH_LABEL;
+const $ = id => document.getElementById(id);
+const money = n => "$" + Math.abs(n).toLocaleString("en-US", {minimumFractionDigits: 2, maximumFractionDigits: 2});
+const money0 = n => "$" + Math.round(Math.abs(n)).toLocaleString("en-US");
+const byId = Object.fromEntries(DATA.map(d => [d.id, d]));
+
+const TAGS = [["one-time","A single event that will not recur"],["prepaid","Paid up front for several months of coverage (insurance, camps)"],["seasonal","The amount varies with the time of year (utilities, propane)"],["reimbursable","Expect to be paid back"],["cancel candidate","Considering cancelling or stopping"],["kids","Child or school related"],["work","Work related"]];
+const freshState = () => ({order: DATA.map(d => d.id), decisions: {}, history: [], notes: {}});
+let state = freshState();
+try { const s = JSON.parse(localStorage.getItem(KEY)); if (s && s.order && s.order.length === DATA.length) { state = s; state.notes = state.notes || {}; Object.values(state.notes).forEach(n => { n.tags = n.tags.map(t => t === "multi-month" ? "prepaid" : t); }); } } catch (e) {}
+const save = () => { try { localStorage.setItem(KEY, JSON.stringify(state)); } catch (e) {} };
+let progressMode = "count";
+try { if (localStorage.getItem(KEY + "-pm") === "dollars") progressMode = "dollars"; } catch (e) {}
+const queue = () => state.order.filter(id => !(id in state.decisions));
+
+function totals() {
+  let f = 0, x = 0, nf = 0, nx = 0;
+  for (const [id, t] of Object.entries(state.decisions)) {
+    const a = Math.abs(byId[id].amount);
+    if (t === "fixed") { f += a; nf++; } else { x += a; nx++; }
+  }
+  const all = DATA.reduce((s, d) => s + Math.abs(d.amount), 0);
+  return {f, x, nf, nx, rem: all - f - x};
+}
+
+function renderChrome() {
+  const t = totals(), q = queue(), done = DATA.length - q.length;
+  $("title").textContent = MONTH_LABEL + " expenses";
+  const allD = DATA.reduce((s, d) => s + Math.abs(d.amount), 0), doneD = allD - t.rem;
+  if (progressMode === "dollars") {
+    $("count").textContent = money0(doneD) + " of " + money0(allD);
+    $("bar").style.width = (100 * doneD / allD) + "%";
+  } else {
+    $("count").textContent = done + " of " + DATA.length;
+    $("bar").style.width = (100 * done / DATA.length) + "%";
+  }
+  $("pm-count").setAttribute("aria-pressed", progressMode === "count");
+  $("pm-dollars").setAttribute("aria-pressed", progressMode === "dollars");
+  $("t-flex").textContent = money0(t.x) + " (" + t.nx + ")";
+  $("t-fixed").textContent = money0(t.f) + " (" + t.nf + ")";
+  $("t-rem").textContent = money0(t.rem);
+  $("btn-undo").disabled = state.history.length === 0;
+  const empty = q.length === 0;
+  document.querySelector(".hints").classList.toggle("hidden", empty);
+  document.querySelector(".keys").classList.toggle("hidden", empty);
+}
+
+function cardEl(d, cls) {
+  const el = document.createElement("div");
+  el.className = "card " + (cls || "");
+  const rank = state.order.indexOf(d.id) + 1;
+  el.innerHTML =
+    '<div class="stamp s-flex">FLEXIBLE</div><div class="stamp s-fixed">FIXED</div><div class="stamp s-skip">SKIP</div>' +
+    '<div class="rank">#' + rank + ' by size &middot; ' + d.date + '</div>' +
+    '<div class="amount"></div><div class="moeq hidden"></div><div class="merchant"></div>' +
+    '<div class="meta"><span class="chip cat"></span><span class="chip hint-' + d.suggested + '">Suggested: ' + d.suggested + '</span></div>' +
+    '<div class="src"></div><div class="note hidden"></div><div class="desc"></div>';
+  el.querySelector(".amount").textContent = money(d.amount);
+  el.querySelector(".merchant").textContent = d.merchant;
+  el.querySelector(".cat").textContent = d.category;
+  el.querySelector(".src").textContent = d.source_label;
+  el.querySelector(".desc").textContent = d.description;
+  const n = state.notes[d.id];
+  if (n) {
+    const nb = el.querySelector(".note"); nb.classList.remove("hidden");
+    n.tags.forEach(t => { const sp = document.createElement("span"); sp.className = "tg"; sp.textContent = t; nb.appendChild(sp); });
+    if (n.text) nb.appendChild(document.createTextNode(n.text));
+    if (n.months) { const me = el.querySelector(".moeq"); me.classList.remove("hidden"); me.textContent = "\u2248 " + money(d.amount / n.months) + "/mo over " + n.months + " months"; }
+  }
+  return el;
+}
+
+function render() {
+  const stage = $("stage"), q = queue();
+  stage.innerHTML = "";
+  renderChrome();
+  if (q.length === 0) { stage.appendChild(donePanel()); return; }
+  if (q.length > 2) stage.appendChild(cardEl(byId[q[2]], "back2"));
+  if (q.length > 1) stage.appendChild(cardEl(byId[q[1]], "back1"));
+  const top = cardEl(byId[q[0]]);
+  stage.appendChild(top);
+  attachDrag(top, q[0]);
+}
+
+function donePanel() {
+  const t = totals(), p = document.createElement("div");
+  p.className = "panel";
+  const flipped = DATA.filter(d => state.decisions[d.id] && state.decisions[d.id] !== d.suggested);
+  p.innerHTML = '<h2>All ' + DATA.length + ' sorted</h2>' +
+    '<div class="split"><div class="x">Flexible<b>' + money(t.x) + '</b>' + t.nx + ' items</div>' +
+    '<div class="f">Fixed<b>' + money(t.f) + '</b>' + t.nf + ' items</div></div>' +
+    '<div>You changed the suggestion on <b>' + flipped.length + '</b> of ' + DATA.length + ' items.</div>' +
+    '<div class="smooth hidden"></div><div class="list"></div>';
+  const list = p.querySelector(".list");
+  if (DATA.some(d => state.notes[d.id] && state.notes[d.id].months)) {
+    let sf = 0, sx = 0;
+    DATA.forEach(d => { const n = state.notes[d.id], a = Math.abs(d.amount) / (n && n.months ? n.months : 1); if (state.decisions[d.id] === "fixed") sf += a; else sx += a; });
+    const sm = p.querySelector(".smooth"); sm.classList.remove("hidden");
+    sm.textContent = "Smoothed month: fixed " + money(sf) + " \u00b7 flexible " + money(sx) + " \u00b7 total " + money(sf + sx) + " (raw " + money(t.f + t.x) + "). Prepaid items are spread over their months; lumps paid in other months are not added back.";
+  }
+  flipped.forEach(d => {
+    const r = document.createElement("div");
+    r.innerHTML = "<span></span><span></span>";
+    r.children[0].textContent = d.merchant + " " + money(d.amount);
+    r.children[1].textContent = d.suggested + " → " + state.decisions[d.id];
+    list.appendChild(r);
+  });
+  const noted = DATA.filter(d => state.notes[d.id]);
+  if (noted.length) {
+    const tt = {};
+    noted.forEach(d => state.notes[d.id].tags.forEach(t => { tt[t] = tt[t] || {n: 0, a: 0}; tt[t].n++; tt[t].a += Math.abs(d.amount); }));
+    const box = document.createElement("div"); box.className = "tagtot";
+    box.textContent = "Notes: " + noted.length + (Object.keys(tt).length ? " \u00b7 " + Object.entries(tt).map(([t, v]) => t + " " + money0(v.a) + " (" + v.n + ")").join(", ") : "");
+    p.appendChild(box);
+    const nl = document.createElement("div"); nl.className = "list";
+    noted.forEach(d => { const r = document.createElement("div"); r.innerHTML = "<span></span><span></span>";
+      r.children[0].textContent = d.merchant + " " + money(d.amount);
+      r.children[1].textContent = state.notes[d.id].tags.join(", ") + (state.notes[d.id].text ? " \u2014 " + state.notes[d.id].text : ""); nl.appendChild(r); });
+    p.appendChild(nl);
+  }
+  return p;
+}
+
+function decide(id, type) {
+  state.decisions[id] = type;
+  state.history.push({kind: "decide", id});
+  save(); render();
+}
+function skip(id) {
+  state.history.push({kind: "skip", prevOrder: state.order.slice()});
+  state.order = state.order.filter(x => x !== id).concat(id);
+  save(); render();
+}
+function undo() {
+  const h = state.history.pop();
+  if (!h) return;
+  if (h.kind === "decide") {
+    delete state.decisions[h.id];
+    state.order = [h.id].concat(state.order.filter(x => x !== h.id));
+  } else state.order = h.prevOrder;
+  save(); render();
+}
+
+function fly(el, dir, id, type) {
+  el.classList.remove("dragging"); el.classList.add("fly");
+  el.style.transform = "translateX(" + (dir * window.innerWidth * 1.1) + "px) rotate(" + (dir * 25) + "deg)";
+  el.style.opacity = "0";
+  setTimeout(() => decide(id, type), 230);
+}
+function flyDown(el, id) {
+  el.classList.remove("dragging"); el.classList.add("fly");
+  el.style.transform = "translateY(" + window.innerHeight + "px)";
+  el.style.opacity = "0";
+  setTimeout(() => skip(id), 230);
+}
+
+function attachDrag(el, id) {
+  let x0 = 0, y0 = 0, dx = 0, dy = 0, t0 = 0, axis = null, active = false;
+  const sf = el.querySelector(".s-fixed"), sx = el.querySelector(".s-flex"), ss = el.querySelector(".s-skip");
+  const canSkip = () => queue().length > 1;
+  const reset = () => { el.classList.remove("dragging"); el.classList.add("snap"); el.style.transform = ""; sf.style.opacity = sx.style.opacity = ss.style.opacity = 0; };
+  el.addEventListener("pointerdown", e => {
+    active = true; x0 = e.clientX; y0 = e.clientY; t0 = e.timeStamp; dx = dy = 0; axis = null;
+    el.setPointerCapture(e.pointerId); el.classList.remove("snap"); el.classList.add("dragging");
+  });
+  el.addEventListener("pointermove", e => {
+    if (!active) return;
+    dx = e.clientX - x0; dy = e.clientY - y0;
+    if (!axis && Math.hypot(dx, dy) > 8) axis = Math.abs(dx) >= Math.abs(dy) ? "x" : "y";
+    if (axis === "x") {
+      el.style.transform = "translate(" + dx + "px," + (dy * 0.3) + "px) rotate(" + (dx / 18) + "deg)";
+      const k = Math.min(Math.abs(dx) / (el.offsetWidth * 0.3), 1);
+      sf.style.opacity = dx > 0 ? k : 0; sx.style.opacity = dx < 0 ? k : 0; ss.style.opacity = 0;
+    } else if (axis === "y") {
+      const down = Math.max(dy, 0), ok = canSkip();
+      el.style.transform = "translateY(" + (ok ? down : down * 0.2) + "px)";
+      ss.style.opacity = ok ? Math.min(down / (el.offsetHeight * 0.25), 1) : 0; sf.style.opacity = sx.style.opacity = 0;
+    }
+  });
+  const end = e => {
+    if (!active) return; active = false;
+    const dt = Math.max(e.timeStamp - t0, 1);
+    if (axis === "x") {
+      const v = dx / dt, commit = Math.abs(dx) > el.offsetWidth * 0.3 || (Math.abs(v) > 0.6 && Math.abs(dx) > 40);
+      if (commit) fly(el, dx > 0 ? 1 : -1, id, dx > 0 ? "fixed" : "flexible"); else reset();
+    } else if (axis === "y") {
+      const v = dy / dt, commit = canSkip() && (dy > el.offsetHeight * 0.25 || (v > 0.6 && dy > 40));
+      if (commit) flyDown(el, id); else reset();
+    } else reset();
+  };
+  el.addEventListener("pointerup", end);
+  el.addEventListener("pointercancel", end);
+}
+
+function act(type) {
+  const q = queue(); if (!q.length) return;
+  const top = $("stage").querySelector(".card:last-child");
+  if (type === "skip") { if (q.length > 1) { top.querySelector(".s-skip").style.opacity = 1; flyDown(top, q[0]); } return; }
+  const st = top.querySelector(type === "fixed" ? ".s-fixed" : ".s-flex"); st.style.opacity = 1;
+  fly(top, type === "fixed" ? 1 : -1, q[0], type);
+}
+
+let noteId = null, noteTags = [], noteMonths = null;
+[2, 3, 6, 12].forEach(m => { const b = document.createElement("button"); b.textContent = m; b.onclick = () => { $("note-months-in").value = m; updPrepaid(); }; $("mq").appendChild(b); });
+function renderTags() {
+  const box = $("note-tags"); box.innerHTML = "";
+  TAGS.forEach(([t, tip]) => {
+    const on = noteTags.includes(t), b = document.createElement("button");
+    b.textContent = t === "prepaid" && on && noteMonths ? "prepaid \u00b7 " + noteMonths + " mo" : t; b.title = tip;
+    b.setAttribute("aria-pressed", on);
+    b.onclick = () => {
+      if (t === "prepaid") { openPrepaid(); return; }
+      noteTags = on ? noteTags.filter(x => x !== t) : noteTags.concat(t); renderTags();
+    };
+    box.appendChild(b);
+  });
+}
+function openNote() {
+  const q = queue(); if (!q.length) return;
+  noteId = q[0]; const d = byId[noteId], n = state.notes[noteId] || {text: "", tags: []};
+  noteTags = n.tags.slice(); noteMonths = n.months || null;
+  $("note-title").textContent = d.merchant + " \u00b7 " + money(d.amount);
+  $("note-text").value = n.text; updNote(); renderTags();
+  $("dlg-note").showModal(); $("note-text").focus();
+}
+function updNote() {
+  const v = $("note-text").value; $("note-count").textContent = v.length + "/280";
+  $("note-warn").textContent = /\d{9,}/.test(v) ? "Long number detected: leave out account numbers" : "";
+}
+function openPrepaid() {
+  const d = byId[noteId];
+  $("pp-what").textContent = d.merchant + " \u00b7 " + money(d.amount);
+  $("note-months-in").value = noteTags.includes("prepaid") && noteMonths ? noteMonths : "";
+  $("pp-remove").classList.toggle("hidden", !noteTags.includes("prepaid"));
+  updPrepaid(); $("dlg-prepaid").showModal(); $("note-months-in").focus();
+}
+function updPrepaid() {
+  const mo = parseInt($("note-months-in").value, 10), ok = mo >= 2 && mo <= 60;
+  $("pp-prev").textContent = ok ? "\u2248 " + money(byId[noteId].amount / mo) + " per month" : "Enter 2 to 60 months";
+  $("pp-ok").disabled = !ok;
+}
+function saveNote() {
+  const text = $("note-text").value.trim();
+  if (/\d{9,}/.test(text)) { updNote(); return; }
+  const pre = noteTags.includes("prepaid");
+  if (!text && !noteTags.length) delete state.notes[noteId]; else state.notes[noteId] = {text, tags: noteTags.slice(), months: pre ? noteMonths : null};
+  save(); $("dlg-note").close(); render();
+}
+$("note-months-in").oninput = updPrepaid;
+$("pp-back").onclick = () => $("dlg-prepaid").close();
+$("pp-remove").onclick = () => { noteTags = noteTags.filter(x => x !== "prepaid"); noteMonths = null; $("dlg-prepaid").close(); renderTags(); };
+$("pp-ok").onclick = () => {
+  const mo = parseInt($("note-months-in").value, 10); if (!(mo >= 2 && mo <= 60)) return;
+  noteMonths = mo; if (!noteTags.includes("prepaid")) noteTags = noteTags.concat("prepaid");
+  $("dlg-prepaid").close(); renderTags();
+};
+$("btn-note").onclick = openNote;
+$("note-text").oninput = updNote;
+$("note-save").onclick = saveNote;
+$("note-cancel").onclick = () => $("dlg-note").close();
+$("note-clear").onclick = () => { noteTags = []; noteMonths = null; $("note-text").value = ""; updNote(); renderTags(); $("note-text").focus(); };
+$("note-text").addEventListener("keydown", e => { if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) saveNote(); });
+const setMode = m => { progressMode = m; try { localStorage.setItem(KEY + "-pm", m); } catch (e) {} renderChrome(); };
+$("pm-count").onclick = () => setMode("count");
+$("pm-dollars").onclick = () => setMode("dollars");
+$("btn-undo").onclick = undo;
+const menu = $("menu"), mbtn = $("menu-btn");
+const setMenu = open => { menu.classList.toggle("hidden", !open); mbtn.setAttribute("aria-expanded", open); };
+mbtn.onclick = e => { e.stopPropagation(); setMenu(menu.classList.contains("hidden")); };
+menu.onclick = () => setMenu(false);
+document.addEventListener("click", e => { if (!menu.contains(e.target)) setMenu(false); });
+$("btn-reset").onclick = () => { if (confirm("Clear all mockup decisions?")) { state = freshState(); save(); render(); } };
+$("btn-rerun").onclick = () => $("dlg-rerun").showModal();
+$("btn-runs").onclick = () => $("dlg-runs").showModal();
+$("rr-close").onclick = () => $("dlg-rerun").close();
+$("runs-close").onclick = () => $("dlg-runs").close();
+document.addEventListener("keydown", e => {
+  if (document.querySelector("dialog[open]")) return;
+  if (!menu.classList.contains("hidden")) { if (e.key === "Escape") { setMenu(false); mbtn.focus(); } return; }
+  if (e.key === "ArrowRight") act("fixed");
+  else if (e.key === "ArrowLeft") act("flexible");
+  else if (e.key === "s" || e.key === "S" || e.key === "ArrowDown") act("skip");
+  else if (e.key === "n" || e.key === "N") { e.preventDefault(); openNote(); }
+  else if (e.key === "z" || e.key === "Z" || e.key === "Backspace") undo();
+});
+render();
+</script>
+</body>
+</html>
