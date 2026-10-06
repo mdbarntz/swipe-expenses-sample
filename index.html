@@ -112,11 +112,18 @@ dialog::backdrop{background:rgba(0,0,0,.45)}
 dialog h2{margin:0 0 8px}
 dialog .row{display:flex;gap:8px;margin-top:12px}
 dialog .row button{flex:1}
+
+.banner,.keys{display:none}
+header{flex-wrap:wrap;row-gap:4px}
+header h1{flex:1 1 100%;font-size:1.15rem}
+.hright{flex:1 1 100%;justify-content:space-between}
+.small{flex-wrap:nowrap}
+.small button{flex:1 1 0}
 </style>
 </head>
 <body>
 <div class="wrap">
-  <div class="banner">SAMPLE DATA (invented). Decisions stay in this browser only.</div>
+  <div class="banner">MOCKUP: decisions stay in this browser only (no database yet)</div>
   <header><h1 id="title"></h1><div class="hright"><div><span class="count" id="count" aria-live="polite"></span><span class="mode" role="group" aria-label="Progress measured by"><button id="pm-count" aria-pressed="true">Count</button><button id="pm-dollars" aria-pressed="false">Dollars</button></span></div><button id="menu-btn" aria-haspopup="true" aria-expanded="false" aria-controls="menu" aria-label="More options">&#8943;</button></div><div class="menu hidden" id="menu" role="menu"><button role="menuitem" id="btn-rerun">Re-run month</button><button role="menuitem" id="btn-runs">Past runs</button><hr><button role="menuitem" id="btn-reset" class="danger">Reset mockup</button></div></header>
   <div class="bar" aria-hidden="true"><i id="bar"></i></div>
   <div class="totals">
